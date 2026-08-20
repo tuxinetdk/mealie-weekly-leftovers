@@ -1,0 +1,54 @@
+name: Feature request
+description: Suggest an improvement or new Weekly Leftovers capability
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature ideas are welcome. Please describe the user problem first, then the proposed solution.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do that the project does not handle well today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe how you think the feature should behave in Mealie.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Are there other ways to solve the same problem?
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Area
+      options:
+        - Meal Planner UI
+        - Leftover selection logic
+        - Shopping list integration
+        - Translations
+        - Docker / build system
+        - Update Guard
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked that this feature has not already been requested.
+          required: true

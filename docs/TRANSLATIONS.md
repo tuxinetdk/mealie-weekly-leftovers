@@ -1,25 +1,44 @@
 # Translations
 
-Locale files are plain JSON objects. The filename must match a locale file that Mealie already ships.
+Mealie Weekly Leftovers keeps feature translations outside the patcher as plain JSON files.
 
-Example:
+## Add a language
 
-```json
-{
-  "leftovers": "Leftovers",
-  "leftovers-from": "Leftovers from",
-  "leftovers-week-recipe": "Weekly Leftovers"
-}
-```
+1. Confirm that Mealie itself ships the locale you want to add.
+2. Copy `locales/TEMPLATE.json` to the exact Mealie locale filename, for example:
 
-Use `locales/TEMPLATE.json` as the complete key list.
+   ```bash
+   cp locales/TEMPLATE.json locales/de-DE.json
+   ```
 
-Validate all bundled translations:
+3. Translate **values only**. Do not rename or remove keys.
+4. Preserve placeholders exactly. For example, `{count}` in:
 
-```bash
-python3 scripts/validate-locales.py
-```
+   ```json
+   "leftovers-selected-days": "{count} days selected"
+   ```
 
-The fallback locale defines the required key set. Every bundled locale must contain the same keys.
+   must remain `{count}` in the translated value.
+5. Validate the locale set:
 
-The default locale is `da-DK`; fallback is `en-US`.
+   ```bash
+   python3 scripts/validate-locales.py
+   ```
+
+6. Open a Pull Request. GitHub's **New translation / translation fix** issue template can be used first if wording needs discussion.
+
+## Template file
+
+`locales/TEMPLATE.json` is intentionally valid, comment-free JSON so it can be copied directly. Its English values are reference text; the keys are the contract used by the patcher.
+
+Do not add `_comment`, metadata, translator names, or other extra keys to locale JSON files. The validator expects every bundled locale to contain exactly the same feature keys as the fallback locale.
+
+## Bundled locales
+
+The initial release includes:
+
+- `da-DK` — Danish, default
+- `en-US` — English, fallback
+- `en-GB` — British English
+
+The default and fallback locales are configured in `config/default.json`.

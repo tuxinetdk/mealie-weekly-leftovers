@@ -1,0 +1,83 @@
+name: Bug report
+description: Report a reproducible problem with Mealie Weekly Leftovers
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Mealie Weekly Leftovers. Please include enough detail to reproduce the problem.
+
+  - type: input
+    id: leftovers-version
+    attributes:
+      label: Mealie Weekly Leftovers version
+      description: For example v1.0.0 or the commit SHA.
+      placeholder: v1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: mealie-version
+    attributes:
+      label: Mealie version
+      description: The exact Mealie version you are running.
+      placeholder: v3.23.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-type
+    attributes:
+      label: Installation type
+      options:
+        - Docker Compose with Update Guard
+        - Docker Compose without Update Guard
+        - Manual patch/build
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the actual behavior and what you expected instead.
+      placeholder: Tell us what went wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Give the shortest reliable sequence that triggers the problem.
+      placeholder: |
+        1. Open Meal Planner
+        2. Choose Leftovers
+        3. Select ...
+        4. Click ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste Update Guard, Docker build, browser console, or Mealie logs. Remove secrets first.
+      render: shell
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Screenshots, browser information, reverse proxy details, or anything else that may matter.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I removed passwords, tokens, webhook URLs, and other secrets from logs.
+          required: true
+        - label: I checked that this problem is not already reported in an open issue.
+          required: true

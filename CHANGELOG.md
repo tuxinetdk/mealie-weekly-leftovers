@@ -14,3 +14,9 @@
 - Automatic stable Mealie release checks.
 - Verified backup, health check, diagnostics, and rollback.
 - Legacy compatibility with early TuxiNet Rester metadata.
+
+## v1.0.0
+
+- Added GitHub Issue Forms for bug reports, feature requests, and translations.
+- Added Pull Request template with validation, translation, compatibility, and safety checks.
+- Expanded translation contribution documentation while keeping `locales/TEMPLATE.json` directly copyable.

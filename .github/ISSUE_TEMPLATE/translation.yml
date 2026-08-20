@@ -1,0 +1,57 @@
+name: New translation / translation fix
+description: Add a locale or improve an existing translation
+title: "[Translation]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping translate Mealie Weekly Leftovers.
+
+        Start from `locales/TEMPLATE.json`. The filename must match a locale that Mealie itself ships, for example `de-DE.json`.
+
+  - type: input
+    id: locale
+    attributes:
+      label: Locale code
+      description: Use the exact Mealie locale identifier.
+      placeholder: de-DE
+    validations:
+      required: true
+
+  - type: input
+    id: language
+    attributes:
+      label: Language name
+      placeholder: German / Deutsch
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Contribution type
+      options:
+        - New locale
+        - Correction to an existing locale
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Translation notes
+      description: Mention regional wording, terminology choices, or strings that need discussion.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: The locale filename matches a locale shipped by Mealie.
+          required: true
+        - label: I used `locales/TEMPLATE.json` as the complete key list.
+          required: true
+        - label: I preserved placeholders such as `{count}` exactly where they are used.
+          required: true
+        - label: I ran `python3 scripts/validate-locales.py` successfully, or I will include the locale in a pull request for CI validation.
+          required: true

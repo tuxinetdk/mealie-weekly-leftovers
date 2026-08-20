@@ -1,0 +1,12 @@
+{
+  "leftovers": "Leftovers",
+  "leftovers-from": "Leftovers from",
+  "leftovers-week-recipe": "Weekly Leftovers",
+  "leftovers-select-source-days": "Select one or more earlier days that have leftovers",
+  "leftovers-select-all-week": "Select the whole week",
+  "leftovers-clear": "Clear selection",
+  "leftovers-selected-days": "{count} days selected",
+  "leftovers-note": "Note",
+  "leftovers-note-hint": "For example: There is also salad and some bread left",
+  "no-leftovers-available": "There are no earlier meals in the visible period available as leftovers"
+}

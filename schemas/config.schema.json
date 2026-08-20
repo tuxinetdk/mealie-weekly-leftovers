@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mealie Weekly Leftovers configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_locale",
+    "fallback_locale",
+    "recipe_name"
+  ],
+  "properties": {
+    "default_locale": {
+      "type": "string",
+      "minLength": 2
+    },
+    "fallback_locale": {
+      "type": "string",
+      "minLength": 2
+    },
+    "recipe_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

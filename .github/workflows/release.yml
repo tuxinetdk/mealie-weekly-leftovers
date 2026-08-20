@@ -1,0 +1,23 @@
+name: Release archive
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create release archive
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          zip -r "mealie-weekly-leftovers-${version}.zip" . \
+            -x ".git/*" ".github/*"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mealie-weekly-leftovers-${{ github.ref_name }}
+          path: mealie-weekly-leftovers-*.zip

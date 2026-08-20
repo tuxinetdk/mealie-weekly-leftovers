@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1.7
+
+ARG NODE_IMAGE
+FROM ${NODE_IMAGE}
+
+WORKDIR /frontend
+
+# Dependency files are copied separately so source-code changes do not invalidate
+# the expensive yarn install layer.
+COPY frontend/package.json frontend/yarn.lock ./
+
+# BuildKit cache persists downloaded Yarn packages even when the lockfile changes.
+RUN --mount=type=cache,id=mealie-yarn-cache,target=/usr/local/share/.cache/yarn \
+    yarn install \
+      --prefer-offline \
+      --frozen-lockfile \
+      --non-interactive \
+      --production=false \
+      --network-timeout 1000000

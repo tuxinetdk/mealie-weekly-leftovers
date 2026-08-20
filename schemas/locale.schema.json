@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Mealie Weekly Leftovers locale",
+  "type": "object",
+  "additionalProperties": {
+    "type": "string"
+  },
+  "required": [
+    "leftovers",
+    "leftovers-from",
+    "leftovers-week-recipe",
+    "leftovers-select-source-days",
+    "leftovers-select-all-week",
+    "leftovers-clear",
+    "leftovers-selected-days",
+    "leftovers-note",
+    "leftovers-note-hint",
+    "no-leftovers-available"
+  ],
+  "properties": {
+    "leftovers": {
+      "type": "string"
+    },
+    "leftovers-from": {
+      "type": "string"
+    },
+    "leftovers-week-recipe": {
+      "type": "string"
+    },
+    "leftovers-select-source-days": {
+      "type": "string"
+    },
+    "leftovers-select-all-week": {
+      "type": "string"
+    },
+    "leftovers-clear": {
+      "type": "string"
+    },
+    "leftovers-selected-days": {
+      "type": "string"
+    },
+    "leftovers-note": {
+      "type": "string"
+    },
+    "leftovers-note-hint": {
+      "type": "string"
+    },
+    "no-leftovers-available": {
+      "type": "string"
+    }
+  }
+}

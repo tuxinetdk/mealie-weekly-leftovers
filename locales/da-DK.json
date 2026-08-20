@@ -1,0 +1,12 @@
+{
+  "leftovers": "Rester",
+  "leftovers-from": "Rester fra",
+  "leftovers-week-recipe": "Rester fra Ugen",
+  "leftovers-select-source-days": "Vælg en eller flere tidligere dage, som der er rester fra",
+  "leftovers-select-all-week": "Vælg hele ugen",
+  "leftovers-clear": "Ryd valg",
+  "leftovers-selected-days": "{count} dage valgt",
+  "leftovers-note": "Note",
+  "leftovers-note-hint": "Fx: Der er også salat og lidt brød tilbage",
+  "no-leftovers-available": "Der er ingen tidligere retter i den viste periode, som kan bruges som rester"
+}

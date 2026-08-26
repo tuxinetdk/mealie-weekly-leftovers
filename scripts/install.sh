@@ -20,7 +20,7 @@ if [[ -z "$TIMEZONE_DEFAULT" ]] && command -v timedatectl >/dev/null 2>&1; then
 fi
 TIMEZONE_DEFAULT="${TIMEZONE_DEFAULT:-UTC}"
 
-echo "Mealie Weekly Leftovers v1.0.0 installer"
+echo "Mealie Weekly Leftovers v1.1.0 installer"
 read -r -p "Mealie directory [$MEALIE_DIR_DEFAULT]: " MEALIE_DIR
 MEALIE_DIR="${MEALIE_DIR:-$MEALIE_DIR_DEFAULT}"
 [[ -f "$MEALIE_DIR/docker-compose.yml" && -f "$MEALIE_DIR/.env" ]] || {
@@ -62,10 +62,11 @@ install -d -m 0755 \
   "$INSTALL_ROOT/config" \
   "$INSTALL_ROOT/docker"
 
-install -m 0755 "$SOURCE_DIR/patch/apply_patch.py" "$INSTALL_ROOT/patch/apply_patch.py"
+install -m 0755 "$SOURCE_DIR"/patch/apply_patch*.py "$INSTALL_ROOT/patch/"
 install -m 0644 "$SOURCE_DIR"/locales/*.json "$INSTALL_ROOT/locales/"
 install -m 0644 "$SOURCE_DIR/config/default.json" "$INSTALL_ROOT/config/default.json"
 install -m 0644 "$SOURCE_DIR/docker/Dockerfile.frontend-deps" "$INSTALL_ROOT/docker/Dockerfile.frontend-deps"
+install -m 0644 "$SOURCE_DIR/docker/Dockerfile.frontend-deps-pnpm" "$INSTALL_ROOT/docker/Dockerfile.frontend-deps-pnpm"
 install -m 0644 "$SOURCE_DIR/docker/Dockerfile.frontend-overlay" "$INSTALL_ROOT/docker/Dockerfile.frontend-overlay"
 install -m 0750 "$SOURCE_DIR/scripts/mealie-update-guard.sh" /usr/local/sbin/mealie-update-guard
 
@@ -84,10 +85,11 @@ chmod 0700 /var/lib/mealie-update-guard "$BACKUP_DIR" "$BUILD_DIR_DEFAULT"
   printf 'CUSTOM_PATCHER=%q\n' "$INSTALL_ROOT/patch/apply_patch.py"
   printf 'CUSTOM_BUILD_DIR=%q\n' "$BUILD_DIR_DEFAULT"
   printf 'CUSTOM_IMAGE_PREFIX=%q\n' "mealie-weekly-leftovers"
-  printf 'CUSTOM_PATCH_REV=%q\n' "v1.0.0"
+  printf 'CUSTOM_PATCH_REV=%q\n' "v1.1.0"
   printf 'CUSTOM_FAST_BUILD_ENABLED=%q\n' "1"
   printf 'CUSTOM_FAST_DOCKERFILE=%q\n' "$INSTALL_ROOT/docker/Dockerfile.frontend-overlay"
   printf 'CUSTOM_DEPS_DOCKERFILE=%q\n' "$INSTALL_ROOT/docker/Dockerfile.frontend-deps"
+  printf 'CUSTOM_PNPM_DEPS_DOCKERFILE=%q\n' "$INSTALL_ROOT/docker/Dockerfile.frontend-deps-pnpm"
   printf 'CUSTOM_UPSTREAM_IMAGE_PREFIX=%q\n' "ghcr.io/mealie-recipes/mealie"
   printf 'CUSTOM_FRONTEND_DEPS_PREFIX=%q\n' "mealie-weekly-leftovers-frontend-deps"
 } > "$CONFIG_FILE"
@@ -127,7 +129,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-TimeoutStartSec=30min
+TimeoutStartSec=60min
 ExecStart=/usr/local/sbin/mealie-update-guard update
 UNIT
 

@@ -19,10 +19,11 @@ source "$CONFIG_FILE"
 : "${CUSTOM_PATCHER:=/usr/local/lib/mealie-weekly-leftovers/patch/apply_patch.py}"
 : "${CUSTOM_BUILD_DIR:=/docker_data/mealie-update-guard/build}"
 : "${CUSTOM_IMAGE_PREFIX:=mealie-weekly-leftovers}"
-: "${CUSTOM_PATCH_REV:=v1.0.0}"
+: "${CUSTOM_PATCH_REV:=v1.1.0}"
 : "${CUSTOM_FAST_BUILD_ENABLED:=1}"
 : "${CUSTOM_FAST_DOCKERFILE:=/usr/local/lib/mealie-weekly-leftovers/docker/Dockerfile.frontend-overlay}"
 : "${CUSTOM_DEPS_DOCKERFILE:=/usr/local/lib/mealie-weekly-leftovers/docker/Dockerfile.frontend-deps}"
+: "${CUSTOM_PNPM_DEPS_DOCKERFILE:=/usr/local/lib/mealie-weekly-leftovers/docker/Dockerfile.frontend-deps-pnpm}"
 : "${CUSTOM_UPSTREAM_IMAGE_PREFIX:=ghcr.io/mealie-recipes/mealie}"
 : "${CUSTOM_FRONTEND_DEPS_PREFIX:=mealie-weekly-leftovers-frontend-deps}"
 
@@ -33,20 +34,23 @@ PENDING_NAME_FILE="$STATE_DIR/pending-name"
 BLOCKED_FILE="$STATE_DIR/blocked-version"
 LAST_SUCCESS_FILE="$STATE_DIR/last-success"
 LAST_FAILURE_FILE="$STATE_DIR/last-failure"
+BUILD_FAILURE_STAGE_FILE="$STATE_DIR/last-build-failure-stage"
+LAST_BUILD_LOG_FILE="$STATE_DIR/last-build-log"
 CUSTOM_OVERRIDE_FILE="$STATE_DIR/docker-compose.weekly-leftovers.yml"
 ACTIVE_CUSTOM_IMAGE_FILE="$STATE_DIR/active-custom-image"
 LOCK_FILE="/run/lock/mealie-update-guard.lock"
 
 mkdir -p "$BACKUP_DIR" "$STATE_DIR" "$CUSTOM_BUILD_DIR" "$(dirname "$LOCK_FILE")"
 
-log() { printf '%s %s\n' "$(date '+%F %T%z')" "$*"; }
+log() { printf '%s %s\n' "$(date '+%F %T%z')" "$*" >&2; }
 die() { log "ERROR: $*" >&2; exit 1; }
 
 need() { command -v "$1" >/dev/null 2>&1 || die "Required command not found: $1"; }
-for c in docker curl python3 tar sha256sum flock grep sed awk sort; do need "$c"; done
+for c in docker curl python3 tar sha256sum flock grep sed awk sort tee; do need "$c"; done
 
 discord() {
   local message="$1"
+  message="${message//\\n/$'\n'}"
   [[ -n "$DISCORD_WEBHOOK_URL" ]] || return 0
   local payload
   payload="$(python3 - "$message" <<'PY'
@@ -106,11 +110,50 @@ services:
 EOF
 }
 
+frontend_package_manager() {
+  local source_dir="$1" has_yarn=0 has_pnpm=0
+  [[ -f "$source_dir/frontend/yarn.lock" ]] && has_yarn=1
+  [[ -f "$source_dir/frontend/pnpm-lock.yaml" ]] && has_pnpm=1
+
+  if (( has_pnpm == 1 && has_yarn == 0 )); then
+    printf 'pnpm\n'
+    return 0
+  fi
+  if (( has_yarn == 1 && has_pnpm == 0 )); then
+    printf 'yarn\n'
+    return 0
+  fi
+
+  if (( has_pnpm == 1 && has_yarn == 1 )); then
+    if grep -Eq 'RUN[[:space:]]+pnpm|pnpm[[:space:]]+(clean-install|install|generate)' "$source_dir/docker/Dockerfile"; then
+      printf 'pnpm\n'
+      return 0
+    fi
+    if grep -Eq 'RUN[[:space:]]+yarn|yarn[[:space:]]+(install|generate)' "$source_dir/docker/Dockerfile"; then
+      printf 'yarn\n'
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 frontend_deps_hash() {
-  local source_dir="$1"
-  [[ -f "$source_dir/frontend/package.json" && -f "$source_dir/frontend/yarn.lock" ]] || return 1
-  cat "$source_dir/frontend/package.json" "$source_dir/frontend/yarn.lock" \
-    | sha256sum | awk '{print substr($1,1,16)}'
+  local source_dir="$1" manager="$2"
+  case "$manager" in
+    yarn)
+      [[ -f "$source_dir/frontend/package.json" && -f "$source_dir/frontend/yarn.lock" ]] || return 1
+      cat "$source_dir/frontend/package.json" "$source_dir/frontend/yarn.lock"
+      ;;
+    pnpm)
+      [[ -f "$source_dir/frontend/package.json" && -f "$source_dir/frontend/pnpm-lock.yaml" ]] || return 1
+      cat "$source_dir/frontend/package.json" "$source_dir/frontend/pnpm-lock.yaml"
+      [[ -f "$source_dir/frontend/pnpm-workspace.yaml" ]] && cat "$source_dir/frontend/pnpm-workspace.yaml"
+      ;;
+    *)
+      return 1
+      ;;
+  esac | sha256sum | awk '{print substr($1,1,16)}'
 }
 
 frontend_node_image() {
@@ -119,8 +162,15 @@ frontend_node_image() {
 }
 
 ensure_frontend_deps_image() {
-  local source_dir="$1" deps_hash="$2" node_image="$3"
-  local deps_tag="${CUSTOM_FRONTEND_DEPS_PREFIX}:${deps_hash}"
+  local source_dir="$1" deps_hash="$2" node_image="$3" manager="$4" build_log="$5"
+  local deps_tag="${CUSTOM_FRONTEND_DEPS_PREFIX}:${manager}-${deps_hash}"
+  local deps_dockerfile=""
+
+  case "$manager" in
+    yarn) deps_dockerfile="$CUSTOM_DEPS_DOCKERFILE" ;;
+    pnpm) deps_dockerfile="$CUSTOM_PNPM_DEPS_DOCKERFILE" ;;
+    *) return 1 ;;
+  esac
 
   if docker image inspect "$deps_tag" >/dev/null 2>&1; then
     log "Frontend dependency image already cached: $deps_tag"
@@ -128,21 +178,20 @@ ensure_frontend_deps_image() {
     return 0
   fi
 
-  [[ -r "$CUSTOM_DEPS_DOCKERFILE" ]] || {
-    log "Fast-build dependency Dockerfile is missing: $CUSTOM_DEPS_DOCKERFILE"
+  [[ -r "$deps_dockerfile" ]] || {
+    log "Fast-build dependency Dockerfile is missing for $manager: $deps_dockerfile"
     return 1
   }
 
-  log "Creating frontend dependency cache image $deps_tag"
-  log "This can be slow only when package.json/yarn.lock change; later feature builds reuse it."
-
+  log "Creating $manager frontend dependency cache image $deps_tag"
   if ! DOCKER_BUILDKIT=1 docker build \
       --build-arg "NODE_IMAGE=$node_image" \
+      --label "io.github.mealie-weekly-leftovers.frontend.package_manager=$manager" \
       --label "io.github.mealie-weekly-leftovers.frontend.deps_hash=$deps_hash" \
-      -f "$CUSTOM_DEPS_DOCKERFILE" \
+      -f "$deps_dockerfile" \
       -t "$deps_tag" \
-      "$source_dir"; then
-    log "Failed to build frontend dependency cache image $deps_tag"
+      "$source_dir" 2>&1 | tee -a "$build_log" >&2; then
+    log "Failed to build $manager frontend dependency cache image $deps_tag"
     return 1
   fi
 
@@ -151,7 +200,7 @@ ensure_frontend_deps_image() {
 }
 
 ensure_upstream_base_image() {
-  local version="$1" image="${CUSTOM_UPSTREAM_IMAGE_PREFIX}:${version}"
+  local version="$1" build_log="$2" image="${CUSTOM_UPSTREAM_IMAGE_PREFIX}:${version}"
 
   if docker image inspect "$image" >/dev/null 2>&1; then
     log "Official Mealie base image already available locally: $image"
@@ -160,7 +209,7 @@ ensure_upstream_base_image() {
   fi
 
   log "Pulling official Mealie base image $image"
-  if ! docker pull "$image" >/dev/null; then
+  if ! docker pull "$image" 2>&1 | tee -a "$build_log" >&2; then
     log "Failed to pull official Mealie base image: $image"
     return 1
   fi
@@ -168,9 +217,78 @@ ensure_upstream_base_image() {
   printf '%s\n' "$image"
 }
 
+try_fast_build() {
+  local version="$1" tag="$2" source_dir="$3" build_log="$4"
+  local manager deps_hash node_image deps_tag base_image
+
+  [[ -r "$CUSTOM_FAST_DOCKERFILE" ]] || {
+    log "Fast-build Dockerfile is missing: $CUSTOM_FAST_DOCKERFILE"
+    return 1
+  }
+
+  manager="$(frontend_package_manager "$source_dir")" || {
+    log "FAST BUILD unavailable: no supported Yarn/pnpm lockfile could be selected"
+    return 1
+  }
+  log "FAST BUILD: detected frontend package manager: $manager"
+
+  deps_hash="$(frontend_deps_hash "$source_dir" "$manager")" || {
+    log "FAST BUILD unavailable: could not calculate $manager dependency hash"
+    return 1
+  }
+
+  node_image="$(frontend_node_image "$source_dir")"
+  [[ -n "$node_image" ]] || {
+    log "FAST BUILD unavailable: could not determine Node image from upstream Dockerfile"
+    return 1
+  }
+
+  deps_tag="$(ensure_frontend_deps_image "$source_dir" "$deps_hash" "$node_image" "$manager" "$build_log")" || return 1
+  base_image="$(ensure_upstream_base_image "$version" "$build_log")" || return 1
+
+  log "FAST BUILD: compiling patched frontend with $manager and overlaying it onto $base_image"
+  if ! DOCKER_BUILDKIT=1 docker build \
+      --label "io.github.mealie-weekly-leftovers.upstream=$version" \
+      --label "io.github.mealie-weekly-leftovers.feature.patch=$CUSTOM_PATCH_REV" \
+      --label "io.github.mealie-weekly-leftovers.build_mode=frontend-overlay" \
+      --label "io.github.mealie-weekly-leftovers.frontend.package_manager=$manager" \
+      --label "io.github.mealie-weekly-leftovers.frontend.deps_hash=$deps_hash" \
+      --build-arg "FRONTEND_DEPS_IMAGE=$deps_tag" \
+      --build-arg "BASE_IMAGE=$base_image" \
+      --build-arg "PACKAGE_MANAGER=$manager" \
+      --build-arg "COMMIT=${version}-weekly-leftovers-${CUSTOM_PATCH_REV}" \
+      -f "$CUSTOM_FAST_DOCKERFILE" \
+      -t "$tag" \
+      "$source_dir" 2>&1 | tee -a "$build_log" >&2; then
+    log "FAST BUILD failed for custom image $tag"
+    return 1
+  fi
+
+  docker image inspect "$tag" >/dev/null 2>&1
+}
+
+full_build() {
+  local version="$1" tag="$2" source_dir="$3" build_log="$4"
+  log "FULL BUILD: building custom image $tag using upstream Dockerfile"
+  if ! docker build \
+      --pull \
+      --label "io.github.mealie-weekly-leftovers.upstream=$version" \
+      --label "io.github.mealie-weekly-leftovers.feature.patch=$CUSTOM_PATCH_REV" \
+      --label "io.github.mealie-weekly-leftovers.build_mode=full" \
+      --build-arg "COMMIT=${version}-weekly-leftovers-${CUSTOM_PATCH_REV}" \
+      -f "$source_dir/docker/Dockerfile" \
+      -t "$tag" \
+      "$source_dir" 2>&1 | tee -a "$build_log" >&2; then
+    log "FULL BUILD failed for custom image $tag"
+    return 1
+  fi
+
+  docker image inspect "$tag" >/dev/null 2>&1
+}
+
 build_custom_image() {
-  local version="$1" tag work tarball source_dir source_url
-  local deps_hash node_image deps_tag base_image
+  local version="$1" tag work tarball source_dir source_url build_log
+  local fast_failed=0
 
   [[ "$CUSTOM_PATCH_ENABLED" == "1" ]] || die "build_custom_image called while CUSTOM_PATCH_ENABLED=$CUSTOM_PATCH_ENABLED"
   [[ -r "$CUSTOM_PATCHER" ]] || {
@@ -185,18 +303,27 @@ build_custom_image() {
     return 0
   fi
 
+  build_log="$STATE_DIR/build-${version#v}-${CUSTOM_PATCH_REV}-$(date '+%Y%m%d-%H%M%S').log"
+  : > "$build_log"
+  chmod 0600 "$build_log" 2>/dev/null || true
+  printf '%s\n' "$build_log" > "$LAST_BUILD_LOG_FILE"
+  rm -f "$BUILD_FAILURE_STAGE_FILE"
+  log "Build log: $build_log"
+
   work="$(mktemp -d "$CUSTOM_BUILD_DIR/${version#v}.XXXXXX")"
   tarball="$work/source.tar.gz"
   source_url="https://github.com/mealie-recipes/mealie/archive/refs/tags/${version}.tar.gz"
 
   log "Downloading Mealie source for $version"
   if ! curl -fsSL --max-time 180 "$source_url" -o "$tarball"; then
+    printf 'download\n' > "$BUILD_FAILURE_STAGE_FILE"
     log "Failed to download Mealie source for $version"
     rm -rf "$work"
     return 1
   fi
 
   if ! tar -xzf "$tarball" -C "$work"; then
+    printf 'extract\n' > "$BUILD_FAILURE_STAGE_FILE"
     log "Failed to extract Mealie source for $version"
     rm -rf "$work"
     return 1
@@ -204,97 +331,60 @@ build_custom_image() {
 
   source_dir="$(find "$work" -mindepth 1 -maxdepth 1 -type d -name 'mealie-*' -print -quit)"
   [[ -n "$source_dir" && -f "$source_dir/docker/Dockerfile" ]] || {
+    printf 'source\n' > "$BUILD_FAILURE_STAGE_FILE"
     log "Could not locate extracted Mealie source tree"
     rm -rf "$work"
     return 1
   }
 
   log "Checking Weekly Leftovers patch compatibility against $version"
-  if ! python3 "$CUSTOM_PATCHER" --root "$source_dir" --check; then
+  if ! python3 "$CUSTOM_PATCHER" --root "$source_dir" --check 2>&1 | tee -a "$build_log" >&2; then
+    printf 'compatibility\n' > "$BUILD_FAILURE_STAGE_FILE"
     log "Weekly Leftovers patch is not compatible with $version"
     rm -rf "$work"
     return 1
   fi
 
   log "Applying Weekly Leftovers patch to $version source"
-  if ! python3 "$CUSTOM_PATCHER" --root "$source_dir" --apply; then
+  if ! python3 "$CUSTOM_PATCHER" --root "$source_dir" --apply 2>&1 | tee -a "$build_log" >&2; then
+    printf 'patch\n' > "$BUILD_FAILURE_STAGE_FILE"
     log "Weekly Leftovers patch application failed for $version"
     rm -rf "$work"
     return 1
   fi
 
   if [[ "$CUSTOM_FAST_BUILD_ENABLED" == "1" ]]; then
-    [[ -r "$CUSTOM_FAST_DOCKERFILE" ]] || {
-      log "Fast-build Dockerfile is missing: $CUSTOM_FAST_DOCKERFILE"
-      rm -rf "$work"
-      return 1
-    }
-
-    deps_hash="$(frontend_deps_hash "$source_dir")" || {
-      log "Could not calculate frontend dependency hash"
-      rm -rf "$work"
-      return 1
-    }
-
-    node_image="$(frontend_node_image "$source_dir")"
-    [[ -n "$node_image" ]] || {
-      log "Could not determine the Node image from upstream Dockerfile"
-      rm -rf "$work"
-      return 1
-    }
-
-    deps_tag="$(ensure_frontend_deps_image "$source_dir" "$deps_hash" "$node_image" | tail -n1)" || {
-      rm -rf "$work"
-      return 1
-    }
-
-    base_image="$(ensure_upstream_base_image "$version" | tail -n1)" || {
-      rm -rf "$work"
-      return 1
-    }
-
-    log "FAST BUILD: compiling patched frontend and overlaying it onto $base_image"
-    log "FAST BUILD: backend, Python dependencies, apt packages and NLTK are reused from the official image"
-
-    if ! DOCKER_BUILDKIT=1 docker build \
-        --label "io.github.mealie-weekly-leftovers.upstream=$version" \
-        --label "io.github.mealie-weekly-leftovers.feature.patch=$CUSTOM_PATCH_REV" \
-        --label "io.github.mealie-weekly-leftovers.build_mode=frontend-overlay" \
-        --label "io.github.mealie-weekly-leftovers.frontend.deps_hash=$deps_hash" \
-        --build-arg "FRONTEND_DEPS_IMAGE=$deps_tag" \
-        --build-arg "BASE_IMAGE=$base_image" \
-        --build-arg "COMMIT=${version}-weekly-leftovers-${CUSTOM_PATCH_REV}" \
-        -f "$CUSTOM_FAST_DOCKERFILE" \
-        -t "$tag" \
-        "$source_dir"; then
-      log "Fast Docker build failed for custom image $tag"
-      rm -rf "$work"
-      return 1
+    if try_fast_build "$version" "$tag" "$source_dir" "$build_log"; then
+      log "FAST BUILD completed successfully: $tag"
+    else
+      fast_failed=1
+      docker image rm -f "$tag" >/dev/null 2>&1 || true
+      log "WARNING: FAST BUILD failed for $version; falling back automatically to FULL BUILD"
+      discord "⚠️ **Mealie $version Fast Build failed** on $(hostname).\nThe Weekly Leftovers compatibility check passed, so the guard is trying the official full Docker build instead.\nCurrent Mealie remains online and has not been stopped."
     fi
-  else
-    log "FULL BUILD: building custom image $tag using upstream Dockerfile"
-    if ! docker build \
-        --pull \
-        --label "io.github.mealie-weekly-leftovers.upstream=$version" \
-        --label "io.github.mealie-weekly-leftovers.feature.patch=$CUSTOM_PATCH_REV" \
-        --label "io.github.mealie-weekly-leftovers.build_mode=full" \
-        --build-arg "COMMIT=${version}-weekly-leftovers-${CUSTOM_PATCH_REV}" \
-        -f "$source_dir/docker/Dockerfile" \
-        -t "$tag" \
-        "$source_dir"; then
-      log "Docker build failed for custom image $tag"
+  fi
+
+  if [[ "$CUSTOM_FAST_BUILD_ENABLED" != "1" || "$fast_failed" == "1" ]]; then
+    if ! full_build "$version" "$tag" "$source_dir" "$build_log"; then
+      if [[ "$fast_failed" == "1" ]]; then
+        printf 'full-after-fast\n' > "$BUILD_FAILURE_STAGE_FILE"
+      else
+        printf 'full\n' > "$BUILD_FAILURE_STAGE_FILE"
+      fi
       rm -rf "$work"
       return 1
     fi
   fi
 
   docker image inspect "$tag" >/dev/null 2>&1 || {
+    printf 'inspect\n' > "$BUILD_FAILURE_STAGE_FILE"
     log "Built image cannot be inspected: $tag"
     rm -rf "$work"
     return 1
   }
 
   rm -rf "$work"
+  rm -f "$BUILD_FAILURE_STAGE_FILE"
   printf '%s\n' "$tag"
 }
 
@@ -577,10 +667,23 @@ update_pending() {
     discord "🧩 **Mealie automatic update preparing** on $(hostname): **$old → $new**. Validating and building the custom **Weekly Leftovers** image first; the current Mealie remains online during this step."
 
     if ! candidate="$(build_custom_image "$new" | tail -n1)"; then
-      printf '%s failed custom Weekly Leftovers build at %s; current stayed on %s\n' "$new" "$(date -Is)" "$old" > "$LAST_FAILURE_FILE"
+      local build_stage build_log reason
+      build_stage="$(cat "$BUILD_FAILURE_STAGE_FILE" 2>/dev/null || printf 'unknown')"
+      build_log="$(cat "$LAST_BUILD_LOG_FILE" 2>/dev/null || true)"
+      case "$build_stage" in
+        compatibility) reason="the Weekly Leftovers compatibility check failed" ;;
+        patch) reason="the Weekly Leftovers patch could not be applied" ;;
+        full-after-fast) reason="Fast Build failed and the automatic Full Build fallback also failed" ;;
+        full) reason="the Full Build failed" ;;
+        download) reason="the Mealie source download failed" ;;
+        extract|source) reason="the Mealie source could not be prepared" ;;
+        inspect) reason="the candidate image was built but could not be verified" ;;
+        *) reason="candidate preparation failed" ;;
+      esac
+      printf '%s failed custom Weekly Leftovers build (%s) at %s; current stayed on %s\n' "$new" "$build_stage" "$(date -Is)" "$old" > "$LAST_FAILURE_FILE"
       printf '%s\n' "$new" > "$BLOCKED_FILE"
       rm -f "$PENDING_FILE" "$PENDING_NAME_FILE"
-      discord "⛔ **Mealie $new was NOT installed** on $(hostname): the custom **Weekly Leftovers** compatibility check or Docker build failed. Current **$old** was never stopped. The release is blocked from automatic retry until reviewed."
+      discord "⛔ **Mealie $new was NOT installed** on $(hostname): $reason.\nCurrent **$old** was never stopped and remains online.\nThe release is blocked from automatic retry until reviewed.${build_log:+\nBuild log: \`$build_log\`}"
       return 1
     fi
 

@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1.7
+
+ARG NODE_IMAGE
+FROM ${NODE_IMAGE}
+
+RUN npm install --global pnpm@11
+
+WORKDIR /frontend
+
+# Mealie v3.24+ uses pnpm. Keep dependency inputs separate so patched source
+# changes do not invalidate the expensive dependency layer.
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml ./
+
+RUN --mount=type=cache,id=mealie-pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm clean-install

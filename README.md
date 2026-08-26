@@ -1,9 +1,5 @@
 # Mealie Weekly Leftovers ♻️
 
-<p align="center">
-  <img src="docs/banner.png" alt="Mealie Weekly Leftovers banner" width="100%">
-</p>
-
 A community patch for [Mealie](https://github.com/mealie-recipes/mealie) that adds a first-class **Weekly Leftovers** workflow to the Meal Planner.
 
 Default language: **Danish (`da-DK`)**  
@@ -81,18 +77,18 @@ When `recipe_name` is `null`, the special recipe name is taken from the default 
 
 ## Fast Docker builds
 
-Weekly Leftovers changes frontend code only. The installer therefore does **not** rebuild the complete Mealie runtime for every patch.
+Weekly Leftovers changes frontend code only, so the Update Guard normally uses a cached frontend-overlay build.
 
-The fast build:
+The build system auto-detects the upstream frontend package manager:
 
-1. downloads the exact pinned Mealie source tag;
-2. applies the patch;
-3. reuses a frontend dependency image keyed by `package.json` + `yarn.lock`;
-4. runs `yarn generate`;
-5. starts from the official Mealie image for the exact same version;
-6. overlays only the generated frontend bundle.
+- `yarn.lock` → Yarn
+- `pnpm-lock.yaml` → pnpm
 
-The official backend, Python environment, OS packages, healthcheck and entrypoint are retained.
+If Fast Build fails **after the Weekly Leftovers compatibility check has passed**, the guard automatically retries with Mealie's official full Docker build. The running Mealie container stays online during both build attempts.
+
+A release is blocked only when patch compatibility/application fails, or when candidate preparation still fails after the Full Build fallback.
+
+The official backend, Python environment, OS packages, healthcheck and entrypoint are retained when the fast overlay succeeds.
 
 ## Automatic Mealie updates
 
@@ -125,6 +121,13 @@ chmod +x scripts/install.sh
 sudo ./scripts/install.sh
 ```
 
+Existing installations can be upgraded in place without restarting Mealie:
+
+```bash
+chmod +x scripts/upgrade.sh
+sudo ./scripts/upgrade.sh
+```
+
 Then test:
 
 ```bash
@@ -138,7 +141,7 @@ sudo mealie-update-guard status
 
 ## Compatibility
 
-v1.0.0 is validated against **Mealie v3.23.1**.
+v1.1.0 is validated against **Mealie v3.23.1 (Yarn)** and **Mealie v3.24.0 (pnpm)**. CI also compiles the patched frontend with each version's upstream Docker toolchain.
 
 The patcher is deliberately fail-closed: if the upstream Vue source anchors change, `--check` fails and the automatic updater keeps the currently working Mealie version online.
 
@@ -164,11 +167,6 @@ python3 patch/apply_patch.py \
   --locales locales \
   --check
 ```
-
-
-## Repository activity
-
-[![Star History Chart](https://api.star-history.com/svg?repos=tuxinetdk/mealie-weekly-leftovers&type=Date)](https://www.star-history.com/#tuxinetdk/mealie-weekly-leftovers&Date)
 
 ## License
 

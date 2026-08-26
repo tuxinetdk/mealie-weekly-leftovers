@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.0
+
+- Added Mealie v3.24.0 compatibility for the refactored Meal Planner entry dialog.
+- Added structural patch dispatch for Mealie v3.23.x and v3.24+ layouts.
+- Added Yarn/pnpm auto-detection for Fast Build.
+- Added automatic Fast Build → Full Build fallback while production stays online.
+- Added persistent candidate build logs and detailed build-failure stages.
+- Fixed Discord messages that displayed literal `\n` instead of line breaks.
+- CI now validates and compiles the patch against Mealie v3.23.1 and v3.24.0.
+- Added a non-destructive `scripts/upgrade.sh` for existing installations.
+- Increased automatic update service timeout to 60 minutes for Full Build fallback.
+
 ## 1.0.0
 
 - Weekly Leftovers mode in Meal Planner.

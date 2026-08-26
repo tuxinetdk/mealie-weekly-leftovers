@@ -12,22 +12,55 @@ jobs:
 
       - name: Validate scripts and locales
         run: |
-          python3 -m py_compile patch/apply_patch.py scripts/validate-locales.py
+          python3 -m py_compile \
+            patch/apply_patch.py \
+            patch/apply_patch_v323.py \
+            patch/apply_patch_v324.py \
+            scripts/validate-locales.py
           bash -n scripts/install.sh
+          bash -n scripts/upgrade.sh
           bash -n scripts/mealie-update-guard.sh
           python3 scripts/validate-locales.py
 
-      - name: Validate patch against Mealie v3.23.1
+  compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mealie:
+          - v3.23.1
+          - v3.24.0
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Mealie ${{ matrix.mealie }}
         run: |
-          curl -fsSL https://github.com/mealie-recipes/mealie/archive/refs/tags/v3.23.1.tar.gz -o /tmp/mealie.tar.gz
+          version="${{ matrix.mealie }}"
+          curl -fsSL \
+            "https://github.com/mealie-recipes/mealie/archive/refs/tags/${version}.tar.gz" \
+            -o /tmp/mealie.tar.gz
           tar -xzf /tmp/mealie.tar.gz -C /tmp
+
+      - name: Validate and apply Weekly Leftovers patch
+        run: |
+          version="${{ matrix.mealie }}"
+          root="/tmp/mealie-${version#v}"
           python3 patch/apply_patch.py \
-            --root /tmp/mealie-3.23.1 \
+            --root "$root" \
             --config config/default.json \
             --locales locales \
             --check
           python3 patch/apply_patch.py \
-            --root /tmp/mealie-3.23.1 \
+            --root "$root" \
             --config config/default.json \
             --locales locales \
             --apply
+
+      - name: Compile patched frontend with upstream toolchain
+        run: |
+          version="${{ matrix.mealie }}"
+          root="/tmp/mealie-${version#v}"
+          DOCKER_BUILDKIT=1 docker build \
+            --target frontend-builder \
+            -f "$root/docker/Dockerfile" \
+            "$root"

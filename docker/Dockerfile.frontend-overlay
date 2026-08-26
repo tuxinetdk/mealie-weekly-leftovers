@@ -5,11 +5,16 @@ FROM ${FRONTEND_DEPS_IMAGE} AS frontend-builder
 
 WORKDIR /frontend
 
-# node_modules already exists in the dependency image.
-# Only the patched source is copied for normal Weekly Leftovers revisions.
+# node_modules and the selected package manager already exist in the dependency
+# image. Only patched source is copied for normal Weekly Leftovers revisions.
 COPY frontend .
 
-RUN yarn generate
+ARG PACKAGE_MANAGER
+RUN case "$PACKAGE_MANAGER" in \
+      yarn) yarn generate ;; \
+      pnpm) pnpm generate ;; \
+      *) echo "Unsupported frontend package manager: $PACKAGE_MANAGER" >&2; exit 64 ;; \
+    esac
 
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS production
@@ -17,9 +22,6 @@ FROM ${BASE_IMAGE} AS production
 ARG COMMIT
 ENV GIT_COMMIT_HASH=${COMMIT}
 
-# Keep the complete, tested upstream backend/runtime and replace only its static
-# frontend bundle. This avoids rebuilding Python, pip, apt, ffmpeg, LDAP libs,
-# NLTK, etc. for a frontend-only Weekly Leftovers patch.
 COPY --from=frontend-builder /frontend/dist /tmp/mealie-weekly-leftovers-frontend
 
 RUN python3 - <<'PY'

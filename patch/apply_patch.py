@@ -29,10 +29,17 @@ def main() -> int:
 
     # Mealie v3.24 moved the meal-plan entry form into this component. Use its
     # presence as a structural feature check instead of relying on a version string.
-    if (root / ENTRY_DIALOG_PATH).exists():
-        implementation = module_dir / "apply_patch_v324.py"
-    else:
+    layout = root / "frontend/app/components/Domain/Mealplan/MealPlanLayout.vue"
+
+    if not (root / ENTRY_DIALOG_PATH).exists():
         implementation = module_dir / "apply_patch_v323.py"
+    elif layout.is_file() and (
+        "recipes: getScaledRecipes(day.meals)," in layout.read_text(encoding="utf-8")
+        or "recipes: getScaledRecipes(day.meals.filter(meal => !isMealplanLeftover(meal)))," in layout.read_text(encoding="utf-8")
+    ):
+        implementation = module_dir / "apply_patch_v329.py"
+    else:
+        implementation = module_dir / "apply_patch_v324.py"
 
     if not implementation.is_file():
         print(f"Weekly Leftovers patch FAILED: missing implementation {implementation}", file=sys.stderr)

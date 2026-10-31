@@ -141,9 +141,9 @@ sudo mealie-update-guard status
 
 ## Compatibility
 
-v1.1.0 was validated against **Mealie v3.23.1 (Yarn)** and **Mealie v3.24.0 (pnpm)**.
+v1.2.0 supports **Mealie v3.23.1 (Yarn)**, **v3.24.0 (pnpm)** and **v3.29.0 (pnpm)**.
 
-The Rester7 development branch additionally supports **Mealie v3.29.0** with recipe scaling preservation and leftovers exclusion from shopping lists. GitHub CI validates v3.23.1, v3.24.0 and v3.29.0. CI also compiles the patched frontend with each version's upstream Docker toolchain.
+Rester7 adds support for **Mealie v3.29.0** with recipe scaling preservation and leftovers exclusion from shopping lists. GitHub CI validates v3.23.1, v3.24.0 and v3.29.0. CI also compiles the patched frontend with each version's upstream Docker toolchain.
 
 The patcher is deliberately fail-closed: if the upstream Vue source anchors change, `--check` fails and the automatic updater keeps the currently working Mealie version online.
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased - Rester7 / Mealie v3.29.0
+## 1.2.0 - Rester7 / Mealie v3.29.0
 
 - Added Rester7 patch compatibility for Mealie v3.29.0.
 - Preserved recipe scaling when creating and editing meal plan entries.

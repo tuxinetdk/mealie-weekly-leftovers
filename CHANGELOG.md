@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased - Rester7 / Mealie v3.29.0
+
+- Added Rester7 patch compatibility for Mealie v3.29.0.
+- Preserved recipe scaling when creating and editing meal plan entries.
+- Excluded leftovers from day-level and bulk shopping-list additions.
+- Preserved legacy Mealie patch compatibility.
+- Extended GitHub Actions compatibility matrix to Mealie v3.29.0.
+- No changes to production installations.
+
 ## 1.1.0
 
 - Added Mealie v3.24.0 compatibility for the refactored Meal Planner entry dialog.

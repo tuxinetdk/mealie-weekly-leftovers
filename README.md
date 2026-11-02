@@ -141,11 +141,46 @@ sudo mealie-update-guard status
 
 ## Compatibility
 
-v1.2.0 supports **Mealie v3.23.1 (Yarn)**, **v3.24.0 (pnpm)** and **v3.29.0 (pnpm)**.
+The current development branch supports:
 
-Rester7 adds support for **Mealie v3.29.0** with recipe scaling preservation and leftovers exclusion from shopping lists. GitHub CI validates v3.23.1, v3.24.0 and v3.29.0. CI also compiles the patched frontend with each version's upstream Docker toolchain.
+- Mealie v3.23.1 (Yarn)
+- Mealie v3.24.0 (pnpm)
+- Mealie v3.29.0 (pnpm)
+- Mealie v3.30.0 (pnpm)
 
-The patcher is deliberately fail-closed: if the upstream Vue source anchors change, `--check` fails and the automatic updater keeps the currently working Mealie version online.
+The latest released version, v1.2.0, supports
+Mealie versions up to v3.29.0.
+
+### Mealie v3.30.0
+
+Rester7 has been adapted to the new weekly meal-plan
+structure and date handling.
+
+Changes include:
+
+- Updated planner imports and shopping-list filtering.
+- Support for the new endDate API field.
+- Leftovers remain individual day entries.
+- Whole-week entries are excluded as leftover source days.
+- Earlier patch implementations remain available.
+
+GitHub Actions validates patch application and compiles
+the frontend against all four supported versions.
+
+### Deployment warning
+
+Source compatibility and frontend compilation have passed.
+
+Manual functional testing in a running Mealie instance
+is still required before production deployment.
+
+The bundled upgrade.sh has not been validated against
+the existing production-specific Rester7 Update Guard.
+Do not run it on production without reviewing the
+installed configuration and patch revision.
+
+The patcher remains fail-closed if upstream source
+anchors change.
 
 ## Legacy compatibility
 

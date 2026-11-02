@@ -66,5 +66,27 @@ jobs:
           root="/tmp/mealie-${version#v}"
           DOCKER_BUILDKIT=1 docker build \
             --target frontend-builder \
+            -t "mealie-rester-frontend:${version#v}" \
             -f "$root/docker/Dockerfile" \
             "$root"
+
+      - name: Export patched v3.30.0 frontend
+        if: matrix.mealie == 'v3.30.0'
+        run: |
+          set -euo pipefail
+          cid="$(docker create mealie-rester-frontend:3.30.0)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          mkdir -p "$RUNNER_TEMP/rester7-artifact"
+          docker cp "$cid:/frontend/dist" "$RUNNER_TEMP/rester7-artifact/dist"
+          tar -C "$RUNNER_TEMP/rester7-artifact" \
+            -czf "$RUNNER_TEMP/rester7-v3.30.0.tar.gz" dist
+          test -s "$RUNNER_TEMP/rester7-v3.30.0.tar.gz"
+
+      - name: Upload patched v3.30.0 frontend
+        if: matrix.mealie == 'v3.30.0'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rester7-mealie-v3.30.0-dist
+          path: ${{ runner.temp }}/rester7-v3.30.0.tar.gz
+          if-no-files-found: error
+          retention-days: 7

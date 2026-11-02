@@ -269,6 +269,25 @@ const i18n = useI18n();''',
 function mealName(mealplan: ReadPlanEntry) {
   const meta = parseMealplanLeftover(mealplan);
   if (meta?.mode === "week") {
+    const dates = [...new Set(meta.sources.map(source => source.date))].sort();
+
+    if (dates.length > 0) {
+      const formatter = new Intl.DateTimeFormat(i18n.locale.value, {
+        weekday: dates.length === 1 ? "long" : "short",
+      });
+
+      const days = dates.map((date) => {
+        const parsed = new Date(`${date}T12:00:00`);
+        if (Number.isNaN(parsed.getTime())) return date;
+        const weekday = formatter.format(parsed).replace(/\\.$/, "");
+        return dates.length > 1 && i18n.locale.value.toLowerCase().startsWith("da")
+          ? weekday.slice(0, 3)
+          : weekday;
+      });
+
+      return `${i18n.t("meal-plan.leftovers-from")} ${days.join(", ")}`;
+    }
+
     return mealplan.recipe?.name || i18n.t("meal-plan.leftovers-week-recipe");
   }
 

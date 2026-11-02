@@ -17,6 +17,7 @@ jobs:
             patch/apply_patch_v323.py \
             patch/apply_patch_v324.py \
             patch/apply_patch_v329.py \
+            patch/apply_patch_v330.py \
             scripts/validate-locales.py
           bash -n scripts/install.sh
           bash -n scripts/upgrade.sh
@@ -32,6 +33,7 @@ jobs:
           - v3.23.1
           - v3.24.0
           - v3.29.0
+          - v3.30.0
     steps:
       - uses: actions/checkout@v4
 

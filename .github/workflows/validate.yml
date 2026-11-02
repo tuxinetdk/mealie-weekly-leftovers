@@ -77,7 +77,25 @@ jobs:
           cid="$(docker create mealie-rester-frontend:3.30.0)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
           mkdir -p "$RUNNER_TEMP/rester7-artifact"
-          docker cp "$cid:/frontend/dist" "$RUNNER_TEMP/rester7-artifact/dist"
+          docker cp -L "$cid:/frontend/dist" "$RUNNER_TEMP/rester7-artifact/dist"
+
+          # Ensure real frontend assets were exported
+          test -d "$RUNNER_TEMP/rester7-artifact/dist"
+
+          count="$(find "$RUNNER_TEMP/rester7-artifact/dist" -type f | wc -l)"
+
+          if [ "$count" -lt 10 ]; then
+            echo "ERROR: Frontend export has only $count files"
+            exit 1
+          fi
+
+          if ! find "$RUNNER_TEMP/rester7-artifact/dist"             -type f -name '*.js' -print -quit | grep -q .; then
+            echo "ERROR: No compiled JavaScript found"
+            exit 1
+          fi
+
+          echo "PASS: Exported $count frontend files"
+          du -sh "$RUNNER_TEMP/rester7-artifact/dist"
           tar -C "$RUNNER_TEMP/rester7-artifact" \
             -czf "$RUNNER_TEMP/rester7-v3.30.0.tar.gz" dist
           test -s "$RUNNER_TEMP/rester7-v3.30.0.tar.gz"

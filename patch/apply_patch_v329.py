@@ -13,6 +13,7 @@ VIEW_PATH = Path("frontend/app/pages/household/mealplan/planner/view.vue")
 PLANNER_PATH = Path("frontend/app/pages/household/mealplan/planner.vue")
 ENTRY_DIALOG_PATH = Path("frontend/app/components/Domain/Household/GroupMealPlanEntryDialog.vue")
 MEALPLAN_LAYOUT_PATH = Path("frontend/app/components/Domain/Mealplan/MealPlanLayout.vue")
+MEALPLAN_DAY_PATH = Path("frontend/app/components/Domain/Mealplan/MealPlanDay.vue")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "default.json"
@@ -713,6 +714,41 @@ function parseEntryDate(date: string) {
 }'''
     return replace_once(text, old_submit, new_submit, "dialog submit")
 
+
+def patch_mealplan_day(text: str) -> str:
+    text = replace_once(
+        text,
+        '    :date="dialog.date"\n',
+        '    :date="dialog.date"\n    :mealplans="mealplans"\n',
+        "day dialog mealplans",
+    )
+
+    text = replace_once(
+        text,
+        'import type { ScaledRecipe } from "~/composables/use-group-mealplan";',
+        'import type { MealsByDate, ScaledRecipe } from "~/composables/use-group-mealplan";',
+        "day mealplans import",
+    )
+
+    text = replace_once(
+        text,
+        '  recipes?: ScaledRecipe[];',
+        '  recipes?: ScaledRecipe[];\n  mealplans: MealsByDate[];',
+        "day mealplans prop",
+    )
+
+    return text
+
+
+def patch_page_day_props(text: str) -> str:
+    return replace_once(
+        text,
+        ':recipes="day.recipes"',
+        ':recipes="day.recipes" :mealplans="mealplans"',
+        "page pass mealplans to day",
+    )
+
+
 def patch_translations(root: Path, apply: bool) -> list[str]:
     locale_files = [p for p in sorted(PROJECT_LOCALES_DIR.glob("*.json")) if p.name != "TEMPLATE.json"]
     if not locale_files:
@@ -753,10 +789,11 @@ def patch_translations(root: Path, apply: bool) -> list[str]:
 def run(root: Path, apply: bool) -> None:
     transforms = {
         PLANNER_PATH: patch_planner,
-        VIEW_PATH: patch_view,
-        EDIT_PATH: patch_edit,
+        VIEW_PATH: lambda text: patch_page_day_props(patch_view(text)),
+        EDIT_PATH: lambda text: patch_page_day_props(patch_edit(text)),
         ENTRY_DIALOG_PATH: patch_entry_dialog,
         MEALPLAN_LAYOUT_PATH: patch_mealplan_layout,
+        MEALPLAN_DAY_PATH: patch_mealplan_day,
     }
 
     for rel in transforms:

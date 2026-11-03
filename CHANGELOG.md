@@ -2,6 +2,8 @@
 
 ## Unreleased - Rester7 / Mealie v3.30.0
 
+- Added English Rester7 fallback to every upstream Mealie locale, and CI locale coverage checks.
+
 - Added Mealie v3.30.0 compatibility.
 - Introduced a dedicated v3.30.0 patch implementation.
 - Updated planner and shopping-list integration.

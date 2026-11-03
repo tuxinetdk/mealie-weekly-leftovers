@@ -18,7 +18,8 @@ jobs:
             patch/apply_patch_v324.py \
             patch/apply_patch_v329.py \
             patch/apply_patch_v330.py \
-            scripts/validate-locales.py
+            scripts/validate-locales.py \
+            scripts/verify-patched-locales.py
           bash -n scripts/install.sh
           bash -n scripts/upgrade.sh
           bash -n scripts/mealie-update-guard.sh
@@ -59,6 +60,12 @@ jobs:
             --config config/default.json \
             --locales locales \
             --apply
+
+      - name: Verify Rester7 locales for every upstream language
+        run: |
+          version="${{ matrix.mealie }}"
+          root="/tmp/mealie-${version#v}"
+          python3 scripts/verify-patched-locales.py --root "$root"
 
       - name: Compile patched frontend with upstream toolchain
         run: |

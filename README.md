@@ -59,7 +59,7 @@ python3 scripts/validate-locales.py
 
 No Python changes are required.
 
-If Mealie does not ship a matching locale file, that locale is skipped during patching.
+Every locale shipped by Mealie receives the Rester7 strings. Danish and English use their provided translations; other languages automatically use English strings until a matching JSON file is added to `locales/`. Weekday names follow the active Mealie locale through `Intl.DateTimeFormat`. The GitHub Actions compatibility matrix validates translation coverage.
 
 ## Special recipe name
 

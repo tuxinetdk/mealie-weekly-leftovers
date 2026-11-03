@@ -769,41 +769,54 @@ def patch_page_day_props(text: str) -> str:
 
 
 def patch_translations(root: Path, apply: bool) -> list[str]:
-    locale_files = [p for p in sorted(PROJECT_LOCALES_DIR.glob("*.json")) if p.name != "TEMPLATE.json"]
-    if not locale_files:
-        fail(f"No locale JSON files found in: {PROJECT_LOCALES_DIR}")
+    """Add Rester7 strings to every Mealie locale, with English fallback."""
+    locale_dir = root / "frontend/app/lang/messages"
+    if not locale_dir.is_dir():
+        fail(f"Missing Mealie locale directory: {locale_dir}")
 
-    fallback_values = load_json_object(
-        PROJECT_LOCALES_DIR / f"{PROJECT_CONFIG['fallback_locale']}.json",
-        "fallback locale",
-    )
-    required_keys = {k for k, v in fallback_values.items() if isinstance(v, str)}
-    changed: list[str] = []
+    fallback_file = PROJECT_LOCALES_DIR / f"{PROJECT_CONFIG['fallback_locale']}.json"
+    fallback = load_json_object(fallback_file, "fallback locale")
+    fallback_values = {key: value for key, value in fallback.items() if isinstance(value, str)}
+    if not fallback_values:
+        fail(f"No fallback translation strings in {fallback_file}")
 
-    for source in locale_files:
+    translations: dict[str, dict[str, str]] = {}
+    for source in sorted(PROJECT_LOCALES_DIR.glob("*.json")):
+        if source.name == "TEMPLATE.json":
+            continue
         values = load_json_object(source, f"locale {source.stem}")
-        string_values = {k: v for k, v in values.items() if isinstance(v, str)}
-        missing = sorted(required_keys - set(string_values))
+        strings = {key: value for key, value in values.items() if isinstance(value, str)}
+        missing = sorted(set(fallback_values) - set(strings))
         if missing:
             fail(f"{source.name}: missing translation keys: {', '.join(missing)}")
+        translations[source.stem] = strings
 
-        target = root / "frontend/app/lang/messages" / source.name
-        if not target.exists():
-            print(f"Skipping locale {source.stem}: Mealie does not ship {target.name}")
-            continue
+    if not translations:
+        fail(f"No locale JSON files found in: {PROJECT_LOCALES_DIR}")
 
+    targets = sorted(locale_dir.glob("*.json"))
+    if not targets:
+        fail(f"No Mealie language files found in: {locale_dir}")
+
+    changed: list[str] = []
+    for target in targets:
         data = json.loads(target.read_text(encoding="utf-8"))
-        meal_plan = data.get("meal-plan")
+        meal_plan = data.get("meal-plan") if isinstance(data, dict) else None
         if not isinstance(meal_plan, dict):
             fail(f"{target.name}: missing meal-plan translation object")
 
-        if any(meal_plan.get(k) != v for k, v in string_values.items()):
+        expected = dict(fallback_values)
+        expected.update(translations.get(target.stem, {}))
+        if any(meal_plan.get(key) != value for key, value in expected.items()):
             changed.append(str(target.relative_to(root)))
             if apply:
-                meal_plan.update(string_values)
-                target.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
+                meal_plan.update(expected)
+                target.write_text(
+                    json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
     return changed
+
 
 def run(root: Path, apply: bool) -> None:
     transforms = {

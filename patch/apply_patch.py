@@ -33,6 +33,12 @@ def main() -> int:
 
     if not (root / ENTRY_DIALOG_PATH).exists():
         implementation = module_dir / "apply_patch_v323.py"
+    elif (
+        (root / "frontend/app/pages/household/mealplan/planner.vue").is_file()
+        and "const allMeals = computed(() => plans.value.flatMap"
+        in (root / "frontend/app/pages/household/mealplan/planner.vue").read_text(encoding="utf-8")
+    ):
+        implementation = module_dir / "apply_patch_v330.py"
     elif layout.is_file() and (
         "recipes: getScaledRecipes(day.meals)," in layout.read_text(encoding="utf-8")
         or "recipes: getScaledRecipes(day.meals.filter(meal => !isMealplanLeftover(meal)))," in layout.read_text(encoding="utf-8")

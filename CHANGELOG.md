@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased - Rester7 / Mealie v3.30.0
+
+- Added English Rester7 fallback to every upstream Mealie locale, and CI locale coverage checks.
+
+- Added Mealie v3.30.0 compatibility.
+- Introduced a dedicated v3.30.0 patch implementation.
+- Updated planner and shopping-list integration.
+- Adapted the meal-plan dialog to whole-week support.
+- Preserved previous Mealie compatibility.
+- Extended CI tests to v3.30.0.
+- Updated GitHub Actions checkout to v7.
+- All five GitHub Actions jobs passed.
+- Production deployment and live functional testing pending.
+
 ## 1.2.0 - Rester7 / Mealie v3.29.0
 
 - Added Rester7 patch compatibility for Mealie v3.29.0.

@@ -776,44 +776,54 @@ function resetDialog() {
     return text
 
 def patch_translations(root: Path, apply: bool) -> list[str]:
-    if not PROJECT_LOCALES_DIR.exists():
-        fail(f"Missing locales directory: {PROJECT_LOCALES_DIR}")
+    """Add Rester7 strings to every Mealie locale, with English fallback."""
+    locale_dir = root / "frontend/app/lang/messages"
+    if not locale_dir.is_dir():
+        fail(f"Missing Mealie locale directory: {locale_dir}")
 
-    locale_files = sorted(PROJECT_LOCALES_DIR.glob("*.json"))
-    locale_files = [path for path in locale_files if path.name != "TEMPLATE.json"]
-    if not locale_files:
+    fallback_file = PROJECT_LOCALES_DIR / f"{PROJECT_CONFIG['fallback_locale']}.json"
+    fallback = load_json_object(fallback_file, "fallback locale")
+    fallback_values = {key: value for key, value in fallback.items() if isinstance(value, str)}
+    if not fallback_values:
+        fail(f"No fallback translation strings in {fallback_file}")
+
+    translations: dict[str, dict[str, str]] = {}
+    for source in sorted(PROJECT_LOCALES_DIR.glob("*.json")):
+        if source.name == "TEMPLATE.json":
+            continue
+        values = load_json_object(source, f"locale {source.stem}")
+        strings = {key: value for key, value in values.items() if isinstance(value, str)}
+        missing = sorted(set(fallback_values) - set(strings))
+        if missing:
+            fail(f"{source.name}: missing translation keys: {', '.join(missing)}")
+        translations[source.stem] = strings
+
+    if not translations:
         fail(f"No locale JSON files found in: {PROJECT_LOCALES_DIR}")
 
-    fallback_path = PROJECT_LOCALES_DIR / f"{PROJECT_CONFIG['fallback_locale']}.json"
-    fallback_values = load_json_object(fallback_path, "fallback locale")
-    required_keys = {key for key, value in fallback_values.items() if isinstance(value, str)}
+    targets = sorted(locale_dir.glob("*.json"))
+    if not targets:
+        fail(f"No Mealie language files found in: {locale_dir}")
 
     changed: list[str] = []
-    for source_path in locale_files:
-        locale = source_path.stem
-        values = load_json_object(source_path, f"locale {locale}")
-        string_values = {key: value for key, value in values.items() if isinstance(value, str)}
-        missing = sorted(required_keys - set(string_values))
-        if missing:
-            fail(f"{source_path.name}: missing translation keys: {', '.join(missing)}")
-
-        target = root / "frontend/app/lang/messages" / source_path.name
-        if not target.exists():
-            print(f"Skipping locale {locale}: Mealie does not ship {target.name}")
-            continue
-
+    for target in targets:
         data = json.loads(target.read_text(encoding="utf-8"))
-        meal_plan = data.get("meal-plan")
+        meal_plan = data.get("meal-plan") if isinstance(data, dict) else None
         if not isinstance(meal_plan, dict):
             fail(f"{target.name}: missing meal-plan translation object")
 
-        if any(meal_plan.get(key) != value for key, value in string_values.items()):
+        expected = dict(fallback_values)
+        expected.update(translations.get(target.stem, {}))
+        if any(meal_plan.get(key) != value for key, value in expected.items()):
             changed.append(str(target.relative_to(root)))
             if apply:
-                meal_plan.update(string_values)
-                target.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
+                meal_plan.update(expected)
+                target.write_text(
+                    json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
     return changed
+
 
 def run(root: Path, apply: bool) -> None:
     transforms = {

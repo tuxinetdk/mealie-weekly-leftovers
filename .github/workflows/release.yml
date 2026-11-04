@@ -1,23 +1,48 @@
-name: Release archive
-
+# Replace .github/workflows/release.yml after review, not before tests.
+# Creating a vX.Y.Z git tag is the explicit publication action.
+name: Publish pinned Rester7 release asset
 on:
   push:
     tags:
-      - "v*"
-
+      - 'v*'
+permissions:
+  contents: read
 jobs:
-  archive:
+  release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Create release archive
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          zip -r "mealie-weekly-leftovers-${version}.zip" . \
-            -x ".git/*" ".github/*"
-
-      - uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v7
         with:
-          name: mealie-weekly-leftovers-${{ github.ref_name }}
-          path: mealie-weekly-leftovers-*.zip
+          fetch-depth: 0
+      - name: Verify stable tag and main ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$(cat VERSION)" = "${GITHUB_REF_NAME#v}"
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          python3 scripts/validate-locales.py
+          python3 -m py_compile patch/apply_patch*.py scripts/verify-patched-locales.py
+      - name: Build exact release tarball and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          prefix="mealie-weekly-leftovers-${GITHUB_REF_NAME#v}/"
+          archive="mealie-weekly-leftovers-${GITHUB_REF_NAME}.tar.gz"
+          git archive --format=tar --prefix="$prefix" HEAD | gzip -n > "$archive"
+          sha256sum "$archive" > "$archive.sha256"
+          test -s "$archive"
+      - name: Publish GitHub release with pinned asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="mealie-weekly-leftovers-${GITHUB_REF_NAME}.tar.gz"
+          gh release create "$GITHUB_REF_NAME" "$archive" "$archive.sha256" \
+            --verify-tag \
+            --title "Mealie Weekly Leftovers $GITHUB_REF_NAME" \
+            --generate-notes

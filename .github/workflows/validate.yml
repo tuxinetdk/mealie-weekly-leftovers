@@ -8,7 +8,7 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate scripts and locales
         run: |
@@ -17,7 +17,9 @@ jobs:
             patch/apply_patch_v323.py \
             patch/apply_patch_v324.py \
             patch/apply_patch_v329.py \
-            scripts/validate-locales.py
+            patch/apply_patch_v330.py \
+            scripts/validate-locales.py \
+            scripts/verify-patched-locales.py
           bash -n scripts/install.sh
           bash -n scripts/upgrade.sh
           bash -n scripts/mealie-update-guard.sh
@@ -32,8 +34,9 @@ jobs:
           - v3.23.1
           - v3.24.0
           - v3.29.0
+          - v3.30.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download Mealie ${{ matrix.mealie }}
         run: |
@@ -58,11 +61,57 @@ jobs:
             --locales locales \
             --apply
 
+      - name: Verify Rester7 locales for every upstream language
+        run: |
+          version="${{ matrix.mealie }}"
+          root="/tmp/mealie-${version#v}"
+          python3 scripts/verify-patched-locales.py --root "$root"
+
       - name: Compile patched frontend with upstream toolchain
         run: |
           version="${{ matrix.mealie }}"
           root="/tmp/mealie-${version#v}"
           DOCKER_BUILDKIT=1 docker build \
             --target frontend-builder \
+            -t "mealie-rester-frontend:${version#v}" \
             -f "$root/docker/Dockerfile" \
             "$root"
+
+      - name: Export patched v3.30.0 frontend
+        if: matrix.mealie == 'v3.30.0'
+        run: |
+          set -euo pipefail
+          cid="$(docker create mealie-rester-frontend:3.30.0)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          mkdir -p "$RUNNER_TEMP/rester7-artifact"
+          docker cp -L "$cid:/frontend/dist" "$RUNNER_TEMP/rester7-artifact/dist"
+
+          # Ensure real frontend assets were exported
+          test -d "$RUNNER_TEMP/rester7-artifact/dist"
+
+          count="$(find "$RUNNER_TEMP/rester7-artifact/dist" -type f | wc -l)"
+
+          if [ "$count" -lt 10 ]; then
+            echo "ERROR: Frontend export has only $count files"
+            exit 1
+          fi
+
+          if ! find "$RUNNER_TEMP/rester7-artifact/dist"             -type f -name '*.js' -print -quit | grep -q .; then
+            echo "ERROR: No compiled JavaScript found"
+            exit 1
+          fi
+
+          echo "PASS: Exported $count frontend files"
+          du -sh "$RUNNER_TEMP/rester7-artifact/dist"
+          tar -C "$RUNNER_TEMP/rester7-artifact" \
+            -czf "$RUNNER_TEMP/rester7-v3.30.0.tar.gz" dist
+          test -s "$RUNNER_TEMP/rester7-v3.30.0.tar.gz"
+
+      - name: Upload patched v3.30.0 frontend
+        if: matrix.mealie == 'v3.30.0'
+        uses: actions/upload-artifact@v7
+        with:
+          name: rester7-mealie-v3.30.0-dist
+          path: ${{ runner.temp }}/rester7-v3.30.0.tar.gz
+          if-no-files-found: error
+          retention-days: 7

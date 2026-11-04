@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG FRONTEND_DEPS_IMAGE
+ARG BASE_IMAGE
 FROM ${FRONTEND_DEPS_IMAGE} AS frontend-builder
 
 WORKDIR /frontend
@@ -9,6 +10,9 @@ WORKDIR /frontend
 # image. Only patched source is copied for normal Weekly Leftovers revisions.
 COPY frontend .
 
+# Match upstream Mealie: Nuxt imports unit locales from the backend tree.
+COPY mealie/repos/seed/resources/units/locales /mealie/repos/seed/resources/units/locales
+
 ARG PACKAGE_MANAGER
 RUN case "$PACKAGE_MANAGER" in \
       yarn) yarn generate ;; \
@@ -16,7 +20,6 @@ RUN case "$PACKAGE_MANAGER" in \
       *) echo "Unsupported frontend package manager: $PACKAGE_MANAGER" >&2; exit 64 ;; \
     esac
 
-ARG BASE_IMAGE
 FROM ${BASE_IMAGE} AS production
 
 ARG COMMIT

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.3.1 - Rester7 / Mealie v3.31.0
+
+- Added compatibility with Mealie v3.31.0.
+- Adapted meal-plan types and frontend markup.
+- Updated the pnpm dependency builder for upstream pnpm 12.18.0.
+- Added deterministic formatting rules for the v3.31.0 patch.
+- Fixed handling of missing legacy leftover source dates.
+- Preserved compatibility with earlier supported Mealie versions.
+- Passed frontend build and ESLint validation.
+- Confirmed zero additional TypeScript diagnostics compared with upstream.
+- Passed 7/7 functional checks on the PostgreSQL test environment.
+- Preserved all 13 existing test recipes after upgrading from v3.30.0.
+
+
 ## Unreleased - Rester7 / Mealie v3.30.0
 
 - Added English Rester7 fallback to every upstream Mealie locale, and CI locale coverage checks.

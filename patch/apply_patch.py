@@ -31,7 +31,13 @@ def main() -> int:
     # presence as a structural feature check instead of relying on a version string.
     layout = root / "frontend/app/components/Domain/Mealplan/MealPlanLayout.vue"
 
-    if not (root / ENTRY_DIALOG_PATH).exists():
+    view = root / "frontend/app/pages/household/mealplan/planner/view.vue"
+    if view.is_file() and (
+        'import type { PlanEntryOut } from "~/lib/api/types/meal-plan";'
+        in view.read_text(encoding="utf-8")
+    ):
+        implementation = module_dir / "apply_patch_v331.py"
+    elif not (root / ENTRY_DIALOG_PATH).exists():
         implementation = module_dir / "apply_patch_v323.py"
     elif (
         (root / "frontend/app/pages/household/mealplan/planner.vue").is_file()

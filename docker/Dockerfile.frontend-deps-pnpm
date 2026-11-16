@@ -3,7 +3,7 @@
 ARG NODE_IMAGE
 FROM ${NODE_IMAGE}
 
-RUN npm install --global pnpm@11
+RUN npm install --global pnpm@12.18.0
 
 WORKDIR /frontend
 
